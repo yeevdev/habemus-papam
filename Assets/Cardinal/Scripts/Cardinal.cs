@@ -6,16 +6,16 @@ public class Cardinal : MonoBehaviour
 {
     [Header("추기경 기본 설정")]
     [Tooltip("추기경 기본 체력")]
-    [SerializeField] private int hp = 100;
+    [SerializeField] private int hp;
 
     [Tooltip("추기경 기본 정치력")]
-    [SerializeField] private int influence = 20;
+    [SerializeField] private int influence;
 
     [Tooltip("추기경 기본 경건함")]
-    [SerializeField] private int piety= 20;
+    [SerializeField] private int piety;
 
     [Header("이동 관련 설정")]
-    [SerializeField] private float moveSpeed = 3.0f;
+    [SerializeField] private float moveSpeed;
 
     // 추기경 멤버변수
     private List<Item> items;
@@ -23,7 +23,6 @@ public class Cardinal : MonoBehaviour
     // 기타 멤버변수
     private ICardinalController controller;
     private Rigidbody2D rb;
-    private Vector2? targetPos = null;  // 이동 시 목표지점
 
     private NavMeshAgent agent;
 
@@ -40,7 +39,6 @@ public class Cardinal : MonoBehaviour
         rb = GetComponentInChildren<Rigidbody2D>();    
         controller = GetComponent<ICardinalController>();
         agent = GetComponent<NavMeshAgent>();
-
         
         if(agent != null)
         {
@@ -51,17 +49,16 @@ public class Cardinal : MonoBehaviour
             //속도 초기화
             agent.speed = moveSpeed;
         }
-        
-
-        
-
-        
     }
 
-    void Start() {}
+    void Start()
+    {
+        InitCardinal();
+    }
 
     void Update()
     {
+        // 이동 로직
         if (agent != null)
         {
             // Player , AI_NPC 구분
@@ -87,9 +84,18 @@ public class Cardinal : MonoBehaviour
                     }
                 }
             }
-            
         }
         
+    }
+
+    void InitCardinal()
+    {
+        GameBalance balance = InGameManager.Instance.Balance;
+
+        hp = balance.InitialHp;
+        influence = balance.InitialInfluence;
+        piety = balance.InitialPiety;
+        moveSpeed = balance.InitialMoveSpeed;
     }
 
     //네브메시 이동 함수
@@ -110,12 +116,9 @@ public class Cardinal : MonoBehaviour
             agent.ResetPath();
         }
 
-
         //키보드 입력
         agent.velocity = new Vector3(direction.x, direction.y, 0) * moveSpeed;
     }
-
-    
 
     public void ChangeHp(int delta)
     {

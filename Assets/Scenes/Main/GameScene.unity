@@ -337,7 +337,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0119e4d2355a48a9b5989aa09969035, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InGameManager
-  maxConclaveTime: 60
+  balance: {fileID: 11400000, guid: fd15b4c664eb74c1590780c1f4d19aec, type: 2}
 --- !u!1 &329747195
 GameObject:
   m_ObjectHideFlags: 0

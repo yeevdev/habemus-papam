@@ -26,7 +26,7 @@ public class GameContext
     {
         currentDay = day;
         currentConclave = conclave;
-        remainingTime = InGameManager.Instance.MaxConclaveTime;
+        remainingTime = InGameManager.Instance.Balance.MaxConclaveTime;
     }
 
     public void AdvanceConclave()
@@ -41,7 +41,7 @@ public class GameContext
             currentConclave++;
         }
 
-        remainingTime = InGameManager.Instance.MaxConclaveTime;
+        remainingTime = InGameManager.Instance.Balance.MaxConclaveTime;
 
         // 이벤트 알림
         OnGameContextEvent?.Invoke(GameContextEvent.ConclaveStart);
@@ -62,18 +62,15 @@ public class GameContext
 
 public class InGameManager : MonoBehaviour
 {
-    [Header("게임 기본 설정")]
-    [Tooltip("한 콘클라베 당 시간(초)")]
-    [SerializeField] float maxConclaveTime = 60.0f;
-
     // 싱글톤
     public static InGameManager Instance { get; private set; }
 
     // 멤버변수
+    [SerializeField] private GameBalance balance;
     private GameContext gameContext;
 
     // 프로퍼티
-    public float MaxConclaveTime => maxConclaveTime;
+    public GameBalance Balance => balance;
 
     void Awake()
     {
