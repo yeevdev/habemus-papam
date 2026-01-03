@@ -77,4 +77,28 @@ public class CardinalManager : MonoBehaviour
         }
     }
 
+    public int GetCardinalHpSum()
+    {
+        int result = 0;
+
+        foreach(var cardinal in cardinals)
+        {
+            result += cardinal.Hp;
+        }
+
+        return result;
+    }
+
+    public int GetCardinalPietySum()
+    {
+        int result = 0;
+
+        foreach(var cardinal in cardinals)
+        {
+            result += cardinal.Piety;
+        }
+
+        return result;
+    }
+
 }
