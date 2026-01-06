@@ -136,10 +136,43 @@ public class Cardinal : MonoBehaviour
     }
 
     // 기도 함수
-    public void Pray() {}
+    public void Pray()
+    {
+        GameBalance balance = InGameManager.Instance.Balance;
+
+        if(Random.value < balance.PraySuccessChance)
+        {
+            // 기도 성공
+            ChangePiety(balance.PraySuccessDeltaPiety);
+            ChangeHp(balance.PraySuccessDeltaHp);
+        }
+        else
+        {
+            // 기도 실패
+            ChangePiety(balance.PrayFailDeltaPiety);
+            ChangeHp(balance.PrayFailDeltaHp);
+        }
+    }
 
     // 연설 함수
-    public void Speech() {}
+    public void Speech()
+    {
+        GameBalance balance = InGameManager.Instance.Balance;
+
+        if(Random.value < balance.SpeechSuccessChance)
+        {
+            // 연설 성공
+            int speechSuccessDeltaInfluence = Random.Range(balance.SpeechSuccessDeltaInfluenceMin, balance.SpeechSuccessDeltaInfluenceMax + 1);
+            ChangeInfluence(speechSuccessDeltaInfluence);
+            ChangeHp(balance.SpeechSuccessDeltaHp);
+        }
+        else
+        {
+            // 연설 실패
+            ChangeInfluence(balance.SpeechFailDeltaInfluence);
+            ChangeHp(balance.SpeechFailDeltaHp);
+        }
+    }
 
     // 공작 함수
     public void Plot() {}
