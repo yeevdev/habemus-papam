@@ -132,4 +132,9 @@ public class InGameManager : MonoBehaviour
 
         return result;
     }
+
+    public float GetRemainingTime()
+    {
+        return gameContext.RemainingTime;
+    }
 }
