@@ -89,13 +89,13 @@ public class CardinalManager : MonoBehaviour
         return result;
     }
 
-    public int GetCardinalPietySum()
+    public int GetCardinalPolSum()
     {
         int result = 0;
 
         foreach(var cardinal in cardinals)
         {
-            result += cardinal.Piety;
+            result += cardinal.Influence;
         }
 
         return result;
