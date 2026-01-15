@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3254171408993394913}
   - component: {fileID: 2029427734063684271}
-  - component: {fileID: 8757927419755544304}
+  - component: {fileID: 7434970650133866091}
   - component: {fileID: 2374191198918746138}
   - component: {fileID: 7364061083165534585}
   - component: {fileID: 8538249392295330253}
@@ -49,13 +49,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a15b5b6defa540e5a25f63bc7113600, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Cardinal
-  currentState: 0
   hp: 100
   influence: 20
   piety: 20
   moveSpeed: 3
-  ConClaving: 0
---- !u!114 &8757927419755544304
+--- !u!114 &7434970650133866091
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -64,9 +62,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 7455590352920837333}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 22aa20b47e02b4ac297866fb747524e1, type: 3}
+  m_Script: {fileID: 11500000, guid: dbe32e12be5088f47a65b285b49615d7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AIController
+  m_EditorClassIdentifier: Assembly-CSharp::StateController
+  currentState: 7
 --- !u!195 &2374191198918746138
 NavMeshAgent:
   m_ObjectHideFlags: 0

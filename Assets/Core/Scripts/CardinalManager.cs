@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
 
-
 // 목적지를 담은 구조체
 [System.Serializable]
 public class ConclavePathData
@@ -49,12 +48,13 @@ public class CardinalManager : MonoBehaviour
     public static CardinalManager Instance { get; private set; }
 
     // 기타 멤버변수
+    // 데이터 관리는 여전히 Cardinal 클래스를 통해 합니다.
     private List<Cardinal> cardinals;
 
     void Awake()
     {
         // 싱글톤
-        if(Instance != null && Instance != this)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
@@ -68,7 +68,7 @@ public class CardinalManager : MonoBehaviour
 
     void Start()
     {
-        
+
     }
 
     // 하이어라키 정렬
@@ -112,6 +112,10 @@ public class CardinalManager : MonoBehaviour
             Cardinal c = cardinals[i];
             if (c == null) continue;
 
+            
+            StateController sc = c.GetComponent<StateController>();
+            if (sc == null) continue;
+
             Vector3 targetPos;
 
             // 2. 그룹 분류 및 고정 좌표 계산
@@ -139,15 +143,16 @@ public class CardinalManager : MonoBehaviour
             }
 
             // 3. 초기 정렬 이동 명령
-            
+
             GameObject tempPoint = new GameObject($"InitPos_{i}");
             tempPoint.transform.SetParent(targetParent.transform);
             tempPoint.transform.position = targetPos;
 
-            c.ConClaving = true;
-            c.SetAgentSize(0.1f, 0.1f); // 빽빽하게 서기 위한 충돌 범위 감소
-            c.MoveToWaypoints(new Transform[] { tempPoint.transform });
             
+            sc.ConClaving = true;           // StateController의 변수
+            c.SetAgentSize(0.1f, 0.1f);     // Cardinal의 변수 (Agent 사이즈 조절)
+            sc.MoveToWaypoints(new Transform[] { tempPoint.transform }); // StateController의 함수
+
         }
 
         Destroy(targetParent, 1f);
@@ -159,8 +164,7 @@ public class CardinalManager : MonoBehaviour
     //정렬 후 퇴장하는 로직
     private IEnumerator ProcessExitSequence()
     {
-        // 1. 추기경들이 처음 줄을 설 때까지 충분히 대기.. 모두 도착 체크하는게 계속 오류나서.. 이부분은 때려맞췄습니다..
-        
+        // 1. 추기경들이 처음 줄을 설 때까지 충분히 대기.. 
         yield return new WaitForSeconds(5.0f);
 
         // 왼쪽이나 오른쪽 그룹에 사람이 남아있다면 계속 반복
@@ -172,9 +176,7 @@ public class CardinalManager : MonoBehaviour
             if (leftGroupList.Count > 0)
             {
                 Cardinal leaver = leftGroupList[0];
-                // 퇴장 위치로 이동
                 MoveCardinalToPoint(leaver, leftExitPoint.position);
-                // 리스트에서 제거 2번을 1번으로 땡겨옴
                 leftGroupList.RemoveAt(0);
             }
 
@@ -182,9 +184,7 @@ public class CardinalManager : MonoBehaviour
             if (rightGroupList.Count > 0)
             {
                 Cardinal leaver = rightGroupList[0];
-                // 퇴장 위치로 이동
                 MoveCardinalToPoint(leaver, rightExitPoint.position);
-                // 리스트에서 제거 2번을 1번으로 땡겨옴
                 rightGroupList.RemoveAt(0);
             }
 
@@ -198,7 +198,6 @@ public class CardinalManager : MonoBehaviour
             // 왼쪽 줄 당기기
             for (int i = 0; i < leftGroupList.Count; i++)
             {
-                // i번째 사람은 i번째 고정 좌표(leftLinePositions[i])로 이동
                 MoveCardinalToPoint(leftGroupList[i], leftLinePositions[i], shiftTargetParent.transform);
             }
 
@@ -211,7 +210,7 @@ public class CardinalManager : MonoBehaviour
             // 임시 객체 삭제 예약
             Destroy(shiftTargetParent, 1f);
 
-            
+
             // 한 쌍이 나가고 다음 쌍이 나갈 때까지의 간격
             yield return new WaitForSeconds(2.0f);
         }
@@ -223,14 +222,19 @@ public class CardinalManager : MonoBehaviour
     // (헬퍼 함수) Vector3 좌표로 이동시키기 위해 임시 오브젝트를 만드는 과정을 단순화
     private void MoveCardinalToPoint(Cardinal c, Vector3 pos, Transform parent = null)
     {
+        // [변경점] StateController 확인
+        StateController sc = c.GetComponent<StateController>();
+        if (sc == null) return;
+
         GameObject tempObj = new GameObject($"Target_{c.name}");
         tempObj.transform.position = pos;
 
         if (parent != null) tempObj.transform.SetParent(parent);
-        else Destroy(tempObj, 2f); 
+        else Destroy(tempObj, 2f);
 
-        c.ConClaving = true; // Cardinal.cs 에서 무작위 이동 OFF
-        c.MoveToWaypoints(new Transform[] { tempObj.transform });
+        
+        sc.ConClaving = true;
+        sc.MoveToWaypoints(new Transform[] { tempObj.transform });
     }
 
     //콘클라베 시작 함수 입장 로직 시작
@@ -239,7 +243,7 @@ public class CardinalManager : MonoBehaviour
         StartCoroutine(SpawnAndMoveAISequence(20));
     }
 
-    //콘클라베 시작 코루틴 -> Cardinal.cs 에게 명령을 내림
+    //콘클라베 시작 코루틴
     private IEnumerator SpawnAndMoveAISequence(int totalCount)
     {
         // 1. 경로 데이터 확보 (Left/Right/Player)
@@ -276,55 +280,77 @@ public class CardinalManager : MonoBehaviour
         // --- 2단계: Player 입장 (1배속) ---
         Time.timeScale = 1f;
         Cardinal playerCardinal = null;
+        StateController playerSC = null; 
 
         if (playerPath != null && playerPath.spawnPoint != null)
         {
             GameObject playerObj = SpawnCardinalReturn(cardinalPrefabPlayer, playerPath.spawnPoint, "Cardinal_Player");
             playerCardinal = playerObj.GetComponent<Cardinal>();
 
-            if (playerCardinal != null && playerPath.waypoints != null)
+            
+            if (playerCardinal != null)
             {
-                playerCardinal.MoveToWaypoints(playerPath.waypoints);
+                playerSC = playerCardinal.GetComponent<StateController>();
+                if (playerSC != null && playerPath.waypoints != null)
+                {
+                    playerSC.MoveToWaypoints(playerPath.waypoints);
+                }
             }
         }
 
         // --- 3단계: Player 도착 대기 ---
-        if (playerCardinal != null)
+        if (playerSC != null)
         {
-            
-            yield return null;
-            yield return new WaitUntil(() => playerCardinal.IsMoving == false);
+            yield return null; // 계산시간 때문에 1프레임 잠시 대기
+            yield return new WaitUntil(() => playerSC.IsMoving == false);
         }
 
         // --- 4단계: 게임 시작 (모두 Idle 전환) ---
-       
 
         foreach (var c in cardinals)
         {
             if (c != null)
             {
-                c.ConClaving = true;
-                c.ChangeState(CardinalState.Idle);
+                StateController sc = c.GetComponent<StateController>();
+                if (sc != null)
+                {
+                    sc.ConClaving = true;
+                    sc.ChangeState(CardinalState.Idle);
+                }
             }
         }
     }
 
     // ---------------------------------------------------------
-    // 추기경 생성 헬퍼 함수 , 기존 생성 소환, 생성 함수들을 통합했습니다!
+    // 추기경 생성 헬퍼 함수
     // ---------------------------------------------------------
+
+    //기존 스폰 함수 
+    void SpawnCardinal(GameObject prefab, Transform spawnPoint, string objName)
+    {
+        GameObject cardinalObj = Instantiate(prefab, spawnPoint.position, Quaternion.identity, GetOrCreateCardinalsContainer());
+        cardinalObj.name = objName;
+
+        Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
+        cardinals.Add(cardinal);
+    }
+
+
+    // 시작할때 사용하는 카디널 스폰 함수
     private void SpawnUnitOnPath(ConclavePathData pathData, string aiName)
     {
         if (pathData.spawnPoint == null) return;
 
         GameObject cardinalObj = SpawnCardinalReturn(cardinalPrefabAI, pathData.spawnPoint, aiName);
-        Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
 
-        if (cardinal != null)
+        // [변경점] StateController를 가져와서 이동 명령
+        StateController sc = cardinalObj.GetComponent<StateController>();
+
+        if (sc != null)
         {
-
             if (pathData.waypoints != null)
             {
-                cardinal.MoveToWaypoints(pathData.waypoints);
+                sc.MoveToWaypoints(pathData.waypoints);
             }
         }
     }
@@ -337,21 +363,21 @@ public class CardinalManager : MonoBehaviour
         Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
         if (cardinal != null)
         {
-            //리스트 등록
+            //리스트 등록 (데이터 접근을 위해 Cardinal 저장)
             cardinals.Add(cardinal);
         }
 
         return cardinalObj;
     }
 
-    
-    // 기타 추기경 함수
 
-    public int GetCardinalHpSum()
+    // 기타 추기경 함수 (데이터 관련이므로 Cardinal 접근 유지)
+
+    public float GetCardinalHpSum()
     {
-        int result = 0;
+        float result = 0;
 
-        foreach(var cardinal in cardinals)
+        foreach (var cardinal in cardinals)
         {
             result += cardinal.Hp;
         }
@@ -359,11 +385,11 @@ public class CardinalManager : MonoBehaviour
         return result;
     }
 
-    public int GetCardinalPietySum()
+    public float GetCardinalPietySum()
     {
-        int result = 0;
+        float result = 0;
 
-        foreach(var cardinal in cardinals)
+        foreach (var cardinal in cardinals)
         {
             result += cardinal.Piety;
         }
