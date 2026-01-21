@@ -10,11 +10,12 @@ using UnityEngine.UI;
 public class UIManager : MonoBehaviour
 {
     [Header("공동선택/인게임/교황판정 분류 오브젝트")]
+    //타이틀 화면은 다른 씬에서 다루기?
     [Tooltip("공동 선택")]public SushiUI Sushi;
     [Tooltip("인게임")]public IngameUI Ingame;
     [Tooltip("교황 판정")]public CheckUI Check;
     [Space(10f)]
-    [Header("환경설정")]    
+    [Header("환경설정")]
     [Tooltip("환경설정")]public SettingsUI Settings;
 
 //Singleton 구현
