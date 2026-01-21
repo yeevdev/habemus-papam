@@ -51,6 +51,8 @@ public class CardinalManager : MonoBehaviour
     // 데이터 관리는 여전히 Cardinal 클래스를 통해 합니다.
     private List<Cardinal> cardinals;
 
+   
+
     void Awake()
     {
         // 싱글톤
@@ -355,20 +357,24 @@ public class CardinalManager : MonoBehaviour
         }
     }
 
-    public float GetCardinalHpSum()
+ 
+
+
+    GameObject SpawnCardinalReturn(GameObject prefab, Transform spawnPoint, string objName)
     {
-        float result = 0;
+        GameObject cardinalObj = Instantiate(prefab, spawnPoint.position, Quaternion.identity, GetOrCreateCardinalsContainer());
+        cardinalObj.name = objName;
 
         Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
         if (cardinal != null)
         {
+            //리스트 등록
             //리스트 등록 (데이터 접근을 위해 Cardinal 저장)
             cardinals.Add(cardinal);
         }
 
         return cardinalObj;
     }
-
 
     // 기타 추기경 함수 (데이터 관련이므로 Cardinal 접근 유지)
 
