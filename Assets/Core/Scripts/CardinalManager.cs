@@ -355,10 +355,9 @@ public class CardinalManager : MonoBehaviour
         }
     }
 
-    GameObject SpawnCardinalReturn(GameObject prefab, Transform spawnPoint, string objName)
+    public float GetCardinalHpSum()
     {
-        GameObject cardinalObj = Instantiate(prefab, spawnPoint.position, Quaternion.identity, GetOrCreateCardinalsContainer());
-        cardinalObj.name = objName;
+        float result = 0;
 
         Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
         if (cardinal != null)
@@ -395,6 +394,14 @@ public class CardinalManager : MonoBehaviour
         }
 
         return result;
+    }
+
+    public void DrainAllCardinalHp(float delta)
+    {
+        foreach(var cardinal in cardinals)
+        {
+            cardinal.ChangeHp(delta);
+        }
     }
 
 }

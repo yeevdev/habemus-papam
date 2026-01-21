@@ -73,9 +73,6 @@ public class Cardinal : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------
-    // 데이터 조작 함수
-    // ---------------------------------------------------------
     public void ChangeHp(float delta)
     {
         hp = Mathf.Clamp(hp + delta, 0f, 100f);
@@ -88,7 +85,7 @@ public class Cardinal : MonoBehaviour
 
     public void ChangePiety(float delta)
     {
-        piety = Mathf.Clamp(piety + delta, 0f, 100f);
+        influence = Mathf.Clamp(piety + delta, 0f, 100f);
     }
 
     // ---------------------------------------------------------
@@ -128,6 +125,7 @@ public class Cardinal : MonoBehaviour
 
         if (Random.value < balance.SpeechSuccessChance)
         {
+            // 연설 성공
             float speechSuccessDeltaInfluence = Random.Range(balance.SpeechSuccessDeltaInfluenceMin, balance.SpeechSuccessDeltaInfluenceMax + 1);
             ChangeInfluence(speechSuccessDeltaInfluence);
             ChangeHp(balance.SpeechSuccessDeltaHp);
