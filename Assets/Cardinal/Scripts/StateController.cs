@@ -53,6 +53,11 @@ public class StateController : MonoBehaviour
     [Tooltip("기도 상태를 유지할 시간 (초)")]
     [SerializeField] private float prayDuration = 3.0f;
 
+    // 대기열 상태인지 확인하는 플래그
+    private bool isWaitingInLine = false;
+    // [추가] 진짜 기도 위치 저장용
+    private Vector3 finalPrayerPos;
+
     // 컴포넌트 참조
     private Cardinal cardinal;                  
     private NavMeshAgent agent;
@@ -631,63 +636,118 @@ public class StateController : MonoBehaviour
     /// <summary>
     /// Gamsil 스크립트에서 호출: 해당 위치로 이동해 기도를 시작하라
     /// </summary>
-    public void OrderToPray(Vector3 targetPos)
+
+    public void OrderToPray(Vector3 targetPos, bool isQueueing)
     {
-        // 1. 상태 변경 (이동 중)
+        // 상태 초기화
+        isWaitingInLine = isQueueing;
+        finalPrayerPos = Vector3.zero; // 아직 모름
+
         ChangeState(CardinalState.ReadyPraying);
 
-        // 2. 시퀀스 코루틴 시작
         if (praySequenceCoroutine != null) StopCoroutine(praySequenceCoroutine);
         praySequenceCoroutine = StartCoroutine(ProcessPraySequence(targetPos));
     }
 
-    private IEnumerator ProcessPraySequence(Vector3 targetPos)
+    // [신규] 대기 중인 NPC에게 진짜 기도를 하러 가라고 명령
+    public void ProceedToRealPrayer(Vector3 realTarget)
     {
-        // --- [Step 1] 특정 위치로 이동 (ReadyPraying 상태) ---
+        if (currentState == CardinalState.ReadyPraying && isWaitingInLine)
+        {
+            isWaitingInLine = false; // 대기 해제
+            finalPrayerPos = realTarget; // 최종 목적지 설정
+            // 코루틴 내부의 WaitUntil이 isWaitingInLine == false를 감지하고 다음 단계로 넘어감
+        }
+    }
+
+
+    private IEnumerator ProcessPraySequence(Vector3 firstTargetPos)
+    {
+        // === [Step 1] 1차 목적지(대기소)로 이동 ===
         if (agent.isOnNavMesh)
         {
-            agent.SetDestination(targetPos);
+            agent.SetDestination(firstTargetPos);
             agent.isStopped = false;
         }
 
-        // 도착 대기
+        // 1차 목적지 도착 대기
         yield return new WaitUntil(() =>
             !agent.pathPending &&
             agent.remainingDistance <= agent.stoppingDistance &&
             agent.velocity.sqrMagnitude <= 0.1f
         );
 
+        // 안전장치
         if (currentState != CardinalState.ReadyPraying) yield break;
 
-        // --- [Step 2] 도착 후 Praying 상태 전환 ---
+        // === [Step 2] 대기열 처리 (Queueing) ===
+        // 도착했는데 아직도 대기해야 한다면 여기서 멈춤
+        if (isWaitingInLine)
+        {
+            if (agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+
+            // [추가됨] 대기 중 바라볼 방향 (왼쪽)
+            Vector2 waitDir = Vector2.left;
+
+            // 대기 신호(isWaitingInLine)가 꺼질 때까지 계속 루프
+            while (isWaitingInLine)
+            {
+                // 매 프레임 왼쪽을 보도록 설정 (애니메이션 상태 갱신)
+                if (animController != null) animController.SetLookDirection(waitDir);
+
+                // 물리적으로 확실히 정지 유지
+                if (agent != null) agent.velocity = Vector3.zero;
+
+                yield return null; // 다음 프레임까지 대기
+            }
+        }
+
+        // === [Step 3] 진짜 기도 장소로 이동 ===
+        // ProceedToRealPrayer 함수가 호출되었다면 finalPrayerPos가 (0,0,0)이 아님
+        if (finalPrayerPos != Vector3.zero)
+        {
+            if (agent.isOnNavMesh)
+            {
+                agent.isStopped = false;
+                agent.SetDestination(finalPrayerPos);
+            }
+
+            // 진짜 기도 장소 도착 대기
+            yield return new WaitUntil(() =>
+                !agent.pathPending &&
+                agent.remainingDistance <= agent.stoppingDistance &&
+                agent.velocity.sqrMagnitude <= 0.1f
+            );
+        }
+
+        // 안전장치
+        if (currentState != CardinalState.ReadyPraying) yield break;
+
+        // === [Step 4] 기도 시작 (Praying) ===
         ChangeState(CardinalState.Praying);
-        // (EnterState에서 agent stop 처리됨)
 
-        // --- [Step 3] 왼쪽 바라보기 & Priority 변경 ---
-
-        // 왼쪽 방향 벡터
+        // 왼쪽 보기 & Priority 변경
         Vector2 leftDir = Vector2.left;
-
-        // 0.5초 동안 확실하게 방향 전환 (관성 제거 및 애니메이션 갱신)
         float rotateTimer = 0f;
         while (rotateTimer < 0.5f)
         {
+            if (currentState != CardinalState.Praying) yield break;
             if (animController != null) animController.SetLookDirection(leftDir);
             if (agent != null) agent.velocity = Vector3.zero;
             rotateTimer += Time.deltaTime;
             yield return null;
         }
 
-        // NavMesh Priority 변경 (0 = 가장 중요, 밀리지 않음)
         if (agent != null) agent.avoidancePriority = 0;
 
-
-        // --- [Step 4] 3초 대기 ---
+        // 기도 시간 대기
         yield return new WaitForSeconds(prayDuration);
 
-
-        // --- [Step 5] 종료 및 Idle 복귀 ---
-        // ExitState(Praying)에서 Priority는 50으로 복구됨
+        // === [Step 5] 종료 ===
         ChangeState(CardinalState.Idle);
     }
 
