@@ -55,7 +55,7 @@ public class StateController : MonoBehaviour
 
     // 대기열 상태인지 확인하는 플래그
     private bool isWaitingInLine = false;
-    // [추가] 진짜 기도 위치 저장용
+    // 진짜 기도 위치 저장용
     private Vector3 finalPrayerPos;
 
     // 컴포넌트 참조
@@ -94,6 +94,8 @@ public class StateController : MonoBehaviour
     {
         EnterState(CardinalState.CutScene);
     }
+
+
 
     void Update()
     {
@@ -200,7 +202,7 @@ public class StateController : MonoBehaviour
 
             if (currentState != CardinalState.Idle) yield break;
 
-            // 1. 일정 확률로 ChatMaster 상태 전환 || ChatMaster 상태 1명 이하일때만 
+            // 일정 확률로 ChatMaster 상태 전환 || ChatMaster 상태 1명 이하일때만 
             if (CardinalManager.Instance != null && CardinalManager.Instance.GetCurrentChatMasterCount() < 2)
             {
                 // 설정된 확률(ChatMaster 변수) 체크
@@ -238,8 +240,39 @@ public class StateController : MonoBehaviour
     // ---------------------------------------------------------
     public void MoveToWaypoints(Transform[] pathNodes)
     {
+        // 실행 중인 모든 시퀀스 코루틴 강제 종료
+        if (chatSequenceCoroutine != null)
+        {
+            StopCoroutine(chatSequenceCoroutine);
+            chatSequenceCoroutine = null;
+        }
+        if (praySequenceCoroutine != null)
+        {
+            StopCoroutine(praySequenceCoroutine);
+            praySequenceCoroutine = null;
+        }
+        if (aiWanderCoroutine != null)
+        {
+            StopCoroutine(aiWanderCoroutine);
+            aiWanderCoroutine = null;
+        }
+
+        // 말풍선 등 정리
+        HideBubble();
+
+        // 상태 변경 (CutScene)
         ChangeState(CardinalState.CutScene);
 
+        //에이전트 물리 상태 강제 리셋 (어떤 상태에서 넘어왔든 이동 가능하게)
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;        // 정지 상태 해제
+            agent.ResetPath();              // 기존 경로 제거
+            agent.velocity = Vector3.zero;  // 관성 제거
+            agent.avoidancePriority = 50;   // 우선순위 초기화
+        }
+
+        // 경로 설정 및 이동 시작
         waypoints.Clear();
         foreach (Transform t in pathNodes)
         {
@@ -304,7 +337,7 @@ public class StateController : MonoBehaviour
         switch (state)
         {
             case CardinalState.Idle:
-                // [추가] Idle 진입 시 에이전트 상태 강제 초기화 (방어 코드)
+                // Idle 진입 시 에이전트 상태 강제 초기화 (방어 코드)
                 if (agent != null && agent.isOnNavMesh)
                 {
                     agent.isStopped = false;
@@ -346,7 +379,14 @@ public class StateController : MonoBehaviour
                 break;
 
             case CardinalState.CutScene:
-                if (agent != null && agent.hasPath) agent.ResetPath();
+                // 컷씬 진입 시 이동 방해 요소 제거
+                if (agent != null && agent.isOnNavMesh)
+                {
+                    agent.isStopped = false; // 이동 가능하도록 설정
+                    agent.ResetPath();
+                    agent.avoidancePriority = 50; // 우선순위 복구
+                }
+
                 if (cardinal != null)
                 {
                     cardinal.SetAgentSize(0.1f, 0.1f);
@@ -359,7 +399,6 @@ public class StateController : MonoBehaviour
                 }
                 if (agent.isOnNavMesh) agent.ResetPath(); // 기존 경로 초기화
                 agent.avoidancePriority = 0;
-                // 실제 로직은 OrderToPray 함수에서 시작된 코루틴이 담당함
                 break;
             case CardinalState.Praying:
                 if (cardinal != null)
@@ -449,12 +488,12 @@ public class StateController : MonoBehaviour
                     praySequenceCoroutine = null;
                 }
 
-                // [수정] 기도 상태 해제 시 이동 관련 설정 확실하게 복구
+                // 기도 상태 해제 시 이동 관련 설정 확실하게 복구
                 if (agent != null && agent.isOnNavMesh)
                 {
                     agent.avoidancePriority = 50; // 밀릴 수 있게 복구
-                    agent.isStopped = false;      // 이동 정지 해제 (중요!)
-                    agent.ResetPath();            // 기존 경로 삭제 (중요!)
+                    agent.isStopped = false;      // 이동 정지 해제 
+                    agent.ResetPath();            // 기존 경로 삭제 
                 }
 
                 HideBubble();
@@ -487,10 +526,10 @@ public class StateController : MonoBehaviour
 
     private IEnumerator ProcessChatSequence()
     {
-        // 1. [Master] 이동 정지
+        // 이동 정지
         if (agent.isOnNavMesh) agent.ResetPath();
 
-        // [위치 선정]
+        // 위치 선정
         Vector3 spawnPos = transform.position;
         Animator myAnim = GetComponentInChildren<Animator>();
         if (myAnim != null)
@@ -500,7 +539,7 @@ public class StateController : MonoBehaviour
             spawnPos += (Vector3)facingDir.normalized * 1.5f;
         }
 
-        // 2. ChatTrigger 생성
+        // ChatTrigger 생성
         GameObject triggerObj = null;
         ChatTrigger triggerScript = null;
         BoxCollider2D triggerCollider = null;
@@ -512,13 +551,12 @@ public class StateController : MonoBehaviour
             triggerCollider = triggerObj.GetComponent<BoxCollider2D>();
         }
 
-        // [상태 변수]
         bool playerDetected = false;
 
-        // 3. 초기 대기 (NPC 수집)
+        // 초기 대기 
         yield return new WaitForSeconds(0.5f);
 
-        // 4. 리스너 선별 (플레이어 제외)
+        // 리스너 선별 (플레이어 제외)
         List<StateController> listeners = new List<StateController>();
         if (triggerScript != null && triggerScript.collectedNPCs.Count > 0)
         {
@@ -576,20 +614,18 @@ public class StateController : MonoBehaviour
         }
 
         // -----------------------------------------------------------------------
-        // [중요] 대형 완성 -> 다각형 콜라이더 생성!
+        // 대형 완성 -> 다각형 콜라이더 생성
         // -----------------------------------------------------------------------
         if (triggerScript != null)
         {
-            // 참가자들의 Transform 리스트 생성
             List<Transform> participantTransforms = new List<Transform>();
             foreach (var p in allParticipants) participantTransforms.Add(p.transform);
 
-            // ChatTrigger에게 "이 좌표들을 잇는 다각형을 만들어라" 명령
             triggerScript.CreateFormationCollider(participantTransforms);
         }
 
         // -----------------------------------------------------------------------
-        // 6. 대화 진행 (실제 감지 시작)
+        // 대화 진행 
         // -----------------------------------------------------------------------
         float chatTimer = 0f;
         float totalWaitTime = Mathf.Max(0, chatDuration - 1.5f);
@@ -630,12 +666,9 @@ public class StateController : MonoBehaviour
     }
 
     // ---------------------------------------------------------
-    // [신규 기능] 감실(Gamsil) 기도 시퀀스
+    // 감실(Gamsil) 기도 시퀀스
     // ---------------------------------------------------------
 
-    /// <summary>
-    /// Gamsil 스크립트에서 호출: 해당 위치로 이동해 기도를 시작하라
-    /// </summary>
 
     public void OrderToPray(Vector3 targetPos, bool isQueueing)
     {
@@ -649,21 +682,19 @@ public class StateController : MonoBehaviour
         praySequenceCoroutine = StartCoroutine(ProcessPraySequence(targetPos));
     }
 
-    // [신규] 대기 중인 NPC에게 진짜 기도를 하러 가라고 명령
+    // 대기 중인 NPC에게 진짜 기도를 하러 가라고 명령
     public void ProceedToRealPrayer(Vector3 realTarget)
     {
         if (currentState == CardinalState.ReadyPraying && isWaitingInLine)
         {
-            isWaitingInLine = false; // 대기 해제
-            finalPrayerPos = realTarget; // 최종 목적지 설정
-            // 코루틴 내부의 WaitUntil이 isWaitingInLine == false를 감지하고 다음 단계로 넘어감
+            isWaitingInLine = false; 
+            finalPrayerPos = realTarget; 
         }
     }
 
 
     private IEnumerator ProcessPraySequence(Vector3 firstTargetPos)
     {
-        // === [Step 1] 1차 목적지(대기소)로 이동 ===
         if (agent.isOnNavMesh)
         {
             agent.SetDestination(firstTargetPos);
@@ -677,11 +708,9 @@ public class StateController : MonoBehaviour
             agent.velocity.sqrMagnitude <= 0.1f
         );
 
-        // 안전장치
         if (currentState != CardinalState.ReadyPraying) yield break;
 
-        // === [Step 2] 대기열 처리 (Queueing) ===
-        // 도착했는데 아직도 대기해야 한다면 여기서 멈춤
+
         if (isWaitingInLine)
         {
             if (agent.isOnNavMesh)
@@ -690,10 +719,10 @@ public class StateController : MonoBehaviour
                 agent.velocity = Vector3.zero;
             }
 
-            // [추가됨] 대기 중 바라볼 방향 (왼쪽)
+            // 대기 중 방향 고정
             Vector2 waitDir = Vector2.left;
 
-            // 대기 신호(isWaitingInLine)가 꺼질 때까지 계속 루프
+            // 대기 신호가 꺼질 때까지 계속 루프
             while (isWaitingInLine)
             {
                 // 매 프레임 왼쪽을 보도록 설정 (애니메이션 상태 갱신)
@@ -706,8 +735,6 @@ public class StateController : MonoBehaviour
             }
         }
 
-        // === [Step 3] 진짜 기도 장소로 이동 ===
-        // ProceedToRealPrayer 함수가 호출되었다면 finalPrayerPos가 (0,0,0)이 아님
         if (finalPrayerPos != Vector3.zero)
         {
             if (agent.isOnNavMesh)
@@ -716,7 +743,7 @@ public class StateController : MonoBehaviour
                 agent.SetDestination(finalPrayerPos);
             }
 
-            // 진짜 기도 장소 도착 대기
+            // 기도 장소 도착 대기
             yield return new WaitUntil(() =>
                 !agent.pathPending &&
                 agent.remainingDistance <= agent.stoppingDistance &&
@@ -724,13 +751,11 @@ public class StateController : MonoBehaviour
             );
         }
 
-        // 안전장치
         if (currentState != CardinalState.ReadyPraying) yield break;
 
-        // === [Step 4] 기도 시작 (Praying) ===
         ChangeState(CardinalState.Praying);
 
-        // 왼쪽 보기 & Priority 변경
+        // 왼쪽 보기 ,Priority 변경
         Vector2 leftDir = Vector2.left;
         float rotateTimer = 0f;
         while (rotateTimer < 0.5f)
@@ -744,10 +769,28 @@ public class StateController : MonoBehaviour
 
         if (agent != null) agent.avoidancePriority = 0;
 
-        // 기도 시간 대기
-        yield return new WaitForSeconds(prayDuration);
+        float currentPrayTimer = 0f;
+        while (currentPrayTimer < prayDuration)
+        {
+            // 상태 체크 (안전장치)
+            if (currentState != CardinalState.Praying) yield break;
 
-        // === [Step 5] 종료 ===
+            // 지속적인 방향 보정 (왼쪽)
+            if (animController != null) animController.SetLookDirection(leftDir);
+
+            // 물리적으로 밀림 방지
+            if (agent != null) agent.velocity = Vector3.zero;
+
+            currentPrayTimer += Time.deltaTime;
+            yield return null; 
+        }
+
+        //기도 함수 호출
+        if (cardinal != null)
+        {
+            cardinal.Pray(); // 실제 스탯 변화 적용
+        }
+
         ChangeState(CardinalState.Idle);
     }
 

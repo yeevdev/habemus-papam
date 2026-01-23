@@ -26,7 +26,7 @@ public class ChatTrigger : MonoBehaviour
         lineCollider = gameObject.AddComponent<EdgeCollider2D>();
         lineCollider.isTrigger = true;
         lineCollider.enabled = false;
-        // 선이 너무 얇으면 감지가 안 될 수 있으므로 두께를 약간 줍니다 (필요 시 조절)
+
         lineCollider.edgeRadius = 0.1f;
     }
 
@@ -65,7 +65,7 @@ public class ChatTrigger : MonoBehaviour
         isFormationActive = true;
     }
 
-    // --- 충돌 감지 로직 (동일) ---
+    // --- 충돌 감지 로직 ---
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!isFormationActive)
@@ -73,10 +73,15 @@ public class ChatTrigger : MonoBehaviour
             // 초기 수집 단계
             if (other.CompareTag("NPC") || other.CompareTag("Player"))
             {
+                // 말풍선(Trigger)을 생성한 본인(Master)은 제외
                 if (transform.parent != null && other.gameObject == transform.parent.gameObject) return;
 
                 StateController sc = other.GetComponent<StateController>();
-                if (sc != null && !collectedNPCs.Contains(sc)) collectedNPCs.Add(sc);
+
+                if (sc != null && !collectedNPCs.Contains(sc) && sc.CurrentState == CardinalState.Idle)
+                {
+                    collectedNPCs.Add(sc);
+                }
             }
         }
         else
