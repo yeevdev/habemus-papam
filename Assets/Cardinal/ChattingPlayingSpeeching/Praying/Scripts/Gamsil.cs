@@ -3,36 +3,36 @@ using UnityEngine;
 
 public class Gamsil : MonoBehaviour
 {
-    [Header("À§Ä¡ ¼³Á¤")]
-    [Tooltip("½ÇÁ¦ ±âµµ¸¦ ¼öÇàÇÒ À§Ä¡")]
+    [Header("ìœ„ì¹˜ ì„¤ì •")]
+    [Tooltip("ì‹¤ì œ ê¸°ë„ë¥¼ ìˆ˜í–‰í•  ìœ„ì¹˜")]
     [SerializeField] private Transform prayTargetPoint;
 
-    [Tooltip("±âµµ ¼ø¼­¸¦ ±â´Ù¸± ´ë±â Àå¼Ò (ÁÙ ¼­´Â °÷)")]
+    [Tooltip("ê¸°ë„ ìˆœì„œë¥¼ ê¸°ë‹¤ë¦´ ëŒ€ê¸° ì¥ì†Œ (ì¤„ ì„œëŠ” ê³³)")]
     [SerializeField] private Transform waitingPoint;
 
-    [Tooltip("WaitingPoint ¿ÀºêÁ§Æ®¿¡ ºÙ¾îÀÖ´Â PrayerWaitingTrigger ÄÄÆ÷³ÍÆ®")]
+    [Tooltip("WaitingPoint ì˜¤ë¸Œì íŠ¸ì— ë¶™ì–´ìˆëŠ” PrayerWaitingTrigger ì»´í¬ë„ŒíŠ¸")]
     [SerializeField] private PrayerWaitingTrigger waitingTrigger;
 
-    [Header("½Ã°£ ¼³Á¤")]
-    [Tooltip("´ë±â¿­ÀÌ ºñ¾úÀ» ¶§ ´ÙÀ½ NPC¸¦ È£ÃâÇÏ±â±îÁö °É¸®´Â ½Ã°£ (ÃÊ)")]
+    [Header("ì‹œê°„ ì„¤ì •")]
+    [Tooltip("ëŒ€ê¸°ì—´ì´ ë¹„ì—ˆì„ ë•Œ ë‹¤ìŒ NPCë¥¼ í˜¸ì¶œí•˜ê¸°ê¹Œì§€ ê±¸ë¦¬ëŠ” ì‹œê°„ (ì´ˆ)")]
     [SerializeField] private float callInterval = 3.0f;
 
-    [Tooltip("°³º° NPC ÀçÈ£Ãâ ´ë±â ½Ã°£ (ÃÊ)")]
+    [Tooltip("ê°œë³„ NPC ì¬í˜¸ì¶œ ëŒ€ê¸° ì‹œê°„ (ì´ˆ)")]
     [SerializeField] private float individualCooldownDuration = 30.0f;
 
-    // °¨ÁöµÈ NPC ¸®½ºÆ® 
+    // ê°ì§€ëœ NPC ë¦¬ìŠ¤íŠ¸ 
     private List<StateController> candidates = new List<StateController>();
 
-    // °³º° ÄğÅ¸ÀÓ °ü¸®
+    // ê°œë³„ ì¿¨íƒ€ì„ ê´€ë¦¬
     private Dictionary<StateController, float> npcLastCalledTime = new Dictionary<StateController, float>();
 
-    // ´ë±â¿­ Å¥ 
+    // ëŒ€ê¸°ì—´ í 
     private Queue<StateController> prayerQueue = new Queue<StateController>();
 
-    // ÇöÀç ±âµµ¸¦ ¼öÇà ÁßÀÎ ´ë»ó
+    // í˜„ì¬ ê¸°ë„ë¥¼ ìˆ˜í–‰ ì¤‘ì¸ ëŒ€ìƒ
     private StateController currentPrayerNPC = null;
 
-    // È£Ãâ Å¸ÀÌ¸Ó
+    // í˜¸ì¶œ íƒ€ì´ë¨¸
     private float timer = 0f;
 
     void Update()
@@ -89,13 +89,13 @@ public class Gamsil : MonoBehaviour
                 continue;
             }
 
-            // ÄğÅ¸ÀÓ Ã¼Å©
+            // ì¿¨íƒ€ì„ ì²´í¬
             if (npcLastCalledTime.ContainsKey(sc))
             {
                 if (Time.time - npcLastCalledTime[sc] < individualCooldownDuration) continue;
             }
 
-            // Áßº¹ Ã¼Å©
+            // ì¤‘ë³µ ì²´í¬
             if (prayerQueue.Contains(sc) || sc == currentPrayerNPC) continue;
 
             if (sc.CurrentState == CardinalState.Idle)
@@ -111,13 +111,13 @@ public class Gamsil : MonoBehaviour
 
         if (bestCandidate != null)
         {
-            // NPCµµ Å¥¿¡ Ãß°¡
+            // NPCë„ íì— ì¶”ê°€
             prayerQueue.Enqueue(bestCandidate);
 
             if (npcLastCalledTime.ContainsKey(bestCandidate)) npcLastCalledTime[bestCandidate] = Time.time;
             else npcLastCalledTime.Add(bestCandidate, Time.time);
 
-            // ´ë±â¼Ò·Î ÀÌµ¿ ¸í·É
+            // ëŒ€ê¸°ì†Œë¡œ ì´ë™ ëª…ë ¹
             bestCandidate.OrderToPray(waitingPoint.position, true);
 
             if (waitingTrigger != null)
@@ -128,7 +128,7 @@ public class Gamsil : MonoBehaviour
         }
     }
 
-    // ´ë±â¿­ Ã³¸®
+    // ëŒ€ê¸°ì—´ ì²˜ë¦¬
     private void ProcessQueue()
     {
         if (IsPrayerSpotOccupied()) return;
@@ -147,7 +147,7 @@ public class Gamsil : MonoBehaviour
         }
     }
 
-    // ÀÚ¸®°¡ Ã¡´ÂÁö È®ÀÎ
+    // ìë¦¬ê°€ ì°¼ëŠ”ì§€ í™•ì¸
     private bool IsPrayerSpotOccupied()
     {
         if (currentPrayerNPC == null) return false;
