@@ -79,6 +79,11 @@ public class Gamsil : MonoBehaviour
         {
             StateController sc = candidates[i];
 
+            if (sc.CurrentState == CardinalState.Scheme || sc.IsSchemer)
+            {
+                continue;
+            }
+
             if (sc == null || sc.CompareTag("Player"))
             {
                 candidates.RemoveAt(i);

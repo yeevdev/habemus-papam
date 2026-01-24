@@ -11,7 +11,6 @@ public class PrayerWaitingTrigger : MonoBehaviour
     public void SetIncomingNPC(StateController npc)
     {
         incomingNPC = npc;
-        // Debug.Log($"NPC {npc.name}가 대기열로 이동 중입니다.");
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -20,9 +19,7 @@ public class PrayerWaitingTrigger : MonoBehaviour
         if (other.CompareTag("NPC"))
         {
             isNpcInside = true;
-            Debug.Log("NPC가 대기열에 도착하여 자리를 선점했습니다.");
 
-            // [추가] 도착한 NPC가 오고 있던 그 녀석이라면, 예약 변수 초기화
             StateController arrivedNPC = other.GetComponent<StateController>();
             if (incomingNPC == arrivedNPC)
             {
@@ -33,7 +30,7 @@ public class PrayerWaitingTrigger : MonoBehaviour
         }
         if (other.CompareTag("Player"))
         {
-            // A. NPC가 이미 물리적으로 안에 있다면 플레이어는 무시
+ 
             if (isNpcInside)
             {
                

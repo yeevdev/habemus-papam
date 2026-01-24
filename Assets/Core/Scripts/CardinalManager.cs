@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 
 // 목적지를 담은 구조체
@@ -309,6 +310,31 @@ public class CardinalManager : MonoBehaviour
                 }
             }
         }
+
+        AssignRandomSchemers();
+
+    }
+
+    // ========================================================================
+    // Scheme 지정 함수
+    // ========================================================================
+    private void AssignRandomSchemers()
+    {
+        Debug.Log("Assigning Schemers (Scheme Start)...");
+
+        var candidates = cardinals.Where(c => c != null && !c.CompareTag("Player")).ToList();
+
+        var selectedSchemers = candidates.OrderBy(x => Random.value).Take(2).ToList();
+
+        foreach (var c in selectedSchemers)
+        {
+            StateController sc = c.GetComponent<StateController>();
+            if (sc != null)
+            {
+                sc.SetSchemerMode(true);
+                Debug.Log($"NPC {c.name} 가 모략가(Scheme)로 지정되었습니다!");
+            }
+        }
     }
 
     // ---------------------------------------------------------
@@ -356,15 +382,13 @@ public class CardinalManager : MonoBehaviour
         Cardinal cardinal = cardinalObj.GetComponent<Cardinal>();
         if (cardinal != null)
         {
-            //리스트 등록
-            //리스트 등록 (데이터 접근을 위해 Cardinal 저장)
             cardinals.Add(cardinal);
         }
 
         return cardinalObj;
     }
 
-    // 현재 ChatMaster 상태인 추기경의 수를 반환하는 함수
+    // 현재 챗마스터 현황 파악
     public int GetCurrentChatMasterCount()
     {
         int count = 0;

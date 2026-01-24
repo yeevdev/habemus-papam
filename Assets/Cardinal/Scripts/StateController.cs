@@ -13,8 +13,7 @@ public enum CardinalState
     InSpeech,
     ChatMaster,
     Chatting,
-    Scheme, // Plot..? 일단 기획서에는 Scheme 라 써있어서 남겨둠
-    SchemeChatting,
+    Scheme, // Plot..? 일단 기획서에는 Scheme 라 써있어서 남겨둠 SchemeChatiing 도 같이 수행
     CutScene
 }
 
@@ -70,6 +69,11 @@ public class StateController : MonoBehaviour
     // 진짜 기도 위치 저장용
     private Vector3 finalPrayerPos;
 
+    // [신규 변수] 이 NPC가 모략(Scheme) 상태에 빠진 NPC인가?
+    public bool IsSchemer { get; private set; } = false;
+
+    private SpriteRenderer spriteRenderer;
+
     // 컴포넌트 참조
     private Cardinal cardinal;                  
     private NavMeshAgent agent;
@@ -99,7 +103,7 @@ public class StateController : MonoBehaviour
         cardinal = GetComponent<Cardinal>();
         agent = GetComponent<NavMeshAgent>();
         inputController = GetComponent<ICardinalController>();
-
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         animController = GetComponentInChildren<Animation_Controller>();
     }
 
@@ -133,7 +137,9 @@ public class StateController : MonoBehaviour
             case CardinalState.ReadyInSpeech: // 연설 준비 상태
                
                 break;
-
+            case CardinalState.Scheme:  //공작가 상태... 쉽지 않..
+                HandleSchemeState();
+                break;
                 // 다른 상태들...
         }
     }
@@ -142,6 +148,7 @@ public class StateController : MonoBehaviour
     // 상태별 로직
     // ---------------------------------------------------------
 
+    // 배회상태일때
     void HandleIdleState()
     {
         // Player 태그일 때: 직접 조작 
@@ -159,6 +166,27 @@ public class StateController : MonoBehaviour
         }
     }
 
+    //공작 상태일때 
+    void HandleSchemeState()
+    {
+
+        if (aiWanderCoroutine == null)
+        {
+            aiWanderCoroutine = StartCoroutine(AIWanderRoutine());
+        }
+    }
+    public void RestoreStateAfterAction()
+    {
+        if (IsSchemer)
+        {
+            ChangeState(CardinalState.Scheme);
+        }
+        else
+        {
+            ChangeState(CardinalState.Idle);
+        }
+    }
+
     void HandleCutSceneState()
     {
         // 컷씬 중 필요한 로직 작성.. 아직 작성하지 않아 남겨둠
@@ -173,19 +201,16 @@ public class StateController : MonoBehaviour
 
         CardinalInputData input = inputController.GetInput();
 
-        // 1순위 키보드 이동 
         if (input.moveDirection != Vector2.zero)
         {
             MoveByKeyboard(input.moveDirection);
         }
-        // 2순위 마우스 이동
         else if (input.targetPos.HasValue)
         {
             MoveToTargetPos(input.targetPos.Value);
         }
         else
         {
-            // 입력이 없고 경로도 없다면 정지
             if (!agent.hasPath && agent.velocity.sqrMagnitude > 0.01f)
             {
                 agent.velocity = Vector3.zero;
@@ -215,11 +240,11 @@ public class StateController : MonoBehaviour
 
     private IEnumerator AIWanderRoutine()
     {
-        while (currentState == CardinalState.Idle)
+        while (currentState == CardinalState.Idle || currentState == CardinalState.Scheme)
         {
-            if (currentState != CardinalState.Idle) yield break;
+            if (currentState != CardinalState.Idle && currentState != CardinalState.Scheme) yield break;
 
-            // 1. ChatMaster 전환 로직 (기존 유지)
+            
             if (CardinalManager.Instance != null && CardinalManager.Instance.GetCurrentChatMasterCount() < 2)
             {
                 if (Random.Range(0f, 100f) < ChatMaster)
@@ -232,15 +257,8 @@ public class StateController : MonoBehaviour
             Vector3 targetPosition;
             bool isRecoveryMove = false;
 
-            // [변경] 기준이 될 Y좌표 가져오기
-            // 할당된 오브젝트가 없으면 본인의 현재 위치를 기준으로 삼음 (안전장치)
             float currentLimitY = (wanderLimitTransform != null) ? wanderLimitTransform.position.y : transform.position.y;
 
-            // =========================================================
-            // [로직] Y좌표 체크 및 목적지 설정
-            // =========================================================
-
-            // A. 현재 위치가 기준선(오브젝트)보다 위에 있는 경우 (복귀 로직)
             if (transform.position.y > currentLimitY)
             {
                 // 기준선보다 1~3m 아래로 강제 설정
@@ -250,13 +268,12 @@ public class StateController : MonoBehaviour
                 targetPosition = new Vector3(randomX, recoveryY, 0);
                 isRecoveryMove = true;
             }
-            // B. 정상 범위 (기준선 아래)
+
             else
             {
                 Vector2 randomCircle = Random.insideUnitCircle * Random.Range(2.0f, 5.0f);
                 targetPosition = transform.position + new Vector3(randomCircle.x, randomCircle.y, 0);
 
-                // [Clamping] 목적지가 기준선보다 높게 잡히면, 기준선 바로 아래로 깎음
                 if (targetPosition.y > currentLimitY)
                 {
                     targetPosition.y = currentLimitY - Random.Range(0.1f, 1.0f);
@@ -264,7 +281,7 @@ public class StateController : MonoBehaviour
             }
 
             // =========================================================
-            // NavMesh 이동 명령 (기존과 동일)
+            // NavMesh 이동 명령 
             // =========================================================
             NavMeshHit hit;
             float sampleRange = isRecoveryMove ? 5.0f : 2.0f;
@@ -277,15 +294,12 @@ public class StateController : MonoBehaviour
                     agent.isStopped = false;
                 }
             }
-
-            // 3. 이동 대기
             yield return new WaitUntil(() =>
-                currentState != CardinalState.Idle ||
+                (currentState != CardinalState.Idle && currentState != CardinalState.Scheme) ||
                 (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance && agent.velocity.sqrMagnitude <= 0.1f)
             );
 
-            // 4. 도착 후 대기 (두리번)
-            if (currentState == CardinalState.Idle)
+            if (currentState == CardinalState.Idle || currentState == CardinalState.Scheme)
             {
                 float waitTime = isRecoveryMove ? Random.Range(0.5f, 1.5f) : Random.Range(1.5f, 4f);
                 float timer = 0f;
@@ -293,7 +307,9 @@ public class StateController : MonoBehaviour
 
                 while (timer < waitTime)
                 {
-                    if (currentState != CardinalState.Idle) yield break;
+
+                    if (currentState != CardinalState.Idle && currentState != CardinalState.Scheme) yield break;
+
                     if (animController != null) animController.SetLookDirection(randomLookDir);
                     if (agent != null) agent.velocity = Vector3.zero;
                     timer += Time.deltaTime;
@@ -337,13 +353,13 @@ public class StateController : MonoBehaviour
         // 상태 변경 (CutScene)
         ChangeState(CardinalState.CutScene);
 
-        //에이전트 물리 상태 강제 리셋 (어떤 상태에서 넘어왔든 이동 가능하게)
+        //에이전트 물리 상태 강제 리셋
         if (agent != null && agent.isOnNavMesh)
         {
-            agent.isStopped = false;        // 정지 상태 해제
-            agent.ResetPath();              // 기존 경로 제거
-            agent.velocity = Vector3.zero;  // 관성 제거
-            agent.avoidancePriority = 50;   // 우선순위 초기화
+            agent.isStopped = false;        
+            agent.ResetPath();              
+            agent.velocity = Vector3.zero;  
+            agent.avoidancePriority = 50;   
         }
 
         // 경로 설정 및 이동 시작
@@ -363,7 +379,6 @@ public class StateController : MonoBehaviour
         {
             Vector3 nextPos = waypoints.Dequeue();
 
-            // 좌표 오차 적용 -> 무작위를 위한 로직 입장때만 실행 됨
             if (waypoints.Count == 0 && ConClaving == false)
             {
                 if (CompareTag("Player"))
@@ -502,7 +517,8 @@ public class StateController : MonoBehaviour
             case CardinalState.InSpeech:
                 if (cardinal != null) cardinal.SetAgentSize(0.1f, 0.1f); // 크기 조절
 
-                // 기존 시퀀스 코루틴 정리 (안전장치)
+                // 기존 시퀀스 코루틴 정리 -----> 레거시 함수.. 나중에 버그 발생시 활성화
+             
                 if (speechSequenceCoroutine != null)
                 {
                     // StopCoroutine(speechSequenceCoroutine); 
@@ -511,12 +527,23 @@ public class StateController : MonoBehaviour
 
                 if (agent != null && agent.isOnNavMesh)
                 {
-                    agent.ResetPath();            // 경로 삭제
-                    agent.isStopped = true;       // 이동 정지
-                    agent.velocity = Vector3.zero; // 관성 제거
-                    agent.avoidancePriority = 50; // 자리 고수
+                    agent.ResetPath();         
+                    agent.isStopped = true;      
+                    agent.velocity = Vector3.zero; 
+                    agent.avoidancePriority = 50; 
                 }
                 ShowBubble(SpeechingBubblePrefab);
+                break;
+            case CardinalState.Scheme:
+                if (agent != null && agent.isOnNavMesh)
+                {
+                    agent.isStopped = false;
+                    agent.ResetPath();
+                }
+                if (aiWanderCoroutine == null)
+                {
+                    aiWanderCoroutine = StartCoroutine(AIWanderRoutine());
+                }
                 break;
         }
     }
@@ -593,9 +620,9 @@ public class StateController : MonoBehaviour
 
                 if (agent != null && agent.isOnNavMesh)
                 {
-                    agent.avoidancePriority = 50; // 밀릴 수 있게 복구
-                    agent.isStopped = false;      // 이동 정지 해제 
-                    agent.ResetPath();            // 기존 경로 삭제 
+                    agent.avoidancePriority = 50; 
+                    agent.isStopped = false;      
+                    agent.ResetPath();           
                 }
 
                 HideBubble();
@@ -618,6 +645,14 @@ public class StateController : MonoBehaviour
                     agent.ResetPath();
                 }
                 HideBubble();
+                break;
+            case CardinalState.Scheme:
+                if (aiWanderCoroutine != null)
+                {
+                    StopCoroutine(aiWanderCoroutine);
+                    aiWanderCoroutine = null;
+                }
+                if (agent != null && agent.isOnNavMesh) agent.ResetPath();
                 break;
         }
     }
@@ -713,8 +748,6 @@ public class StateController : MonoBehaviour
             }
         }
 
-        // 5. 이동 및 자리잡기
-
         yield return new WaitForSeconds(1.5f); // 이동 대기
 
         // 방향 보정 (0.5초)
@@ -777,7 +810,6 @@ public class StateController : MonoBehaviour
             yield return null;
         }
 
-        // 7. 종료 처리
         foreach (var listener in listeners)
         {
             if (listener.CurrentState == CardinalState.Chatting) listener.ChangeState(CardinalState.Idle);
@@ -1024,6 +1056,42 @@ public class StateController : MonoBehaviour
         ChangeState(CardinalState.Idle);
     }
 
+    // =========================================================
+    // Scheme 상태로 만드는 함수
+    // =========================================================
+    public void SetSchemerMode(bool active)
+    {
+        IsSchemer = active;
+
+        if (active)
+        {
+            if (spriteRenderer != null) spriteRenderer.color = Color.blue;
+
+            if (currentState == CardinalState.Idle || currentState == CardinalState.Chatting)
+            {
+                ChangeState(CardinalState.Scheme);
+            }
+        }
+        else
+        {
+            // 색상 복구 (흰색)
+            if (spriteRenderer != null) spriteRenderer.color = Color.white;
+            IsSchemer = false;
+            ChangeState(CardinalState.Idle);
+        }
+    }
+
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        // 플레이어와 충돌
+        if (currentState == CardinalState.Scheme && other.CompareTag("Player"))
+        {
+            Debug.Log($"[Scheme] 모략가 {name}가 플레이어를 감지했습니다!");
+
+            // Plot() 함수 실행 
+        }
+    }
 
     public void EnterChatListener()
     {
@@ -1033,11 +1101,11 @@ public class StateController : MonoBehaviour
         }
     }
 
-    public void MoveToPosition(Vector3 targetPos) // 채팅 상태일때 움직이도록
+    public void MoveToPosition(Vector3 targetPos) 
     {
         if (agent != null && agent.isOnNavMesh)
         {
-            agent.isStopped = false; // 정지 해제
+            agent.isStopped = false; 
             agent.SetDestination(targetPos);
         }
     }

@@ -20,7 +20,7 @@ public class Lecture : MonoBehaviour
     private List<StateController> candidates = new List<StateController>();
     private Dictionary<StateController, float> npcLastCalledTime = new Dictionary<StateController, float>();
 
-    // [변경] 연설 큐
+    // 연설 큐
     private Queue<StateController> speechQueue = new Queue<StateController>();
     private StateController currentSpeaker = null;
     private float timer = 0f;
@@ -62,9 +62,16 @@ public class Lecture : MonoBehaviour
         StateController bestCandidate = null;
         float minDistance = float.MaxValue;
 
+
+
         for (int i = candidates.Count - 1; i >= 0; i--)
         {
             StateController sc = candidates[i];
+
+            if (sc.CurrentState == CardinalState.Scheme || sc.IsSchemer)
+            {
+                continue;
+            }
 
             if (sc == null || sc.CompareTag("Player"))
             {

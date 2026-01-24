@@ -44,22 +44,21 @@ public class ChatTrigger : MonoBehaviour
             localPoints.Add(transform.InverseTransformPoint(p.position));
         }
 
-        // --- 분기 처리 ---
         if (participants.Count == 2)
         {
             // [2명] -> EdgeCollider2D (직선) 사용
-            polyCollider.enabled = false; // 다각형 끄기
+            polyCollider.enabled = false; 
 
-            lineCollider.SetPoints(localPoints); // 두 점을 잇는 선 설정
-            lineCollider.enabled = true;  // 선 켜기
+            lineCollider.SetPoints(localPoints); 
+            lineCollider.enabled = true;  
         }
         else
         {
             // [3명 이상] -> PolygonCollider2D (다각형) 사용
-            lineCollider.enabled = false; // 선 끄기
+            lineCollider.enabled = false; 
 
             polyCollider.points = localPoints.ToArray();
-            polyCollider.enabled = true;  // 다각형 켜기
+            polyCollider.enabled = true;  
         }
 
         isFormationActive = true;
@@ -70,7 +69,6 @@ public class ChatTrigger : MonoBehaviour
     {
         if (!isFormationActive)
         {
-            // 초기 수집 단계
             if (other.CompareTag("NPC") || other.CompareTag("Player"))
             {
                 // 말풍선(Trigger)을 생성한 본인(Master)은 제외
@@ -86,7 +84,6 @@ public class ChatTrigger : MonoBehaviour
         }
         else
         {
-            // 포메이션 형성 후 감지
             if (other.CompareTag("Player"))
             {
                 IsPlayerInFormation = true;
