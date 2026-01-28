@@ -85,7 +85,7 @@ public class Cardinal : MonoBehaviour
 
     public void ChangePiety(float delta)
     {
-        piety = Mathf.Clamp(piety + delta, 0f, 100f);
+        influence = Mathf.Clamp(piety + delta, 0f, 100f);
     }
 
     // ---------------------------------------------------------
