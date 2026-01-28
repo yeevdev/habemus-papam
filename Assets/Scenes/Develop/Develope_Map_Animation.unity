@@ -6320,6 +6320,7 @@ MonoBehaviour:
     waypoints:
     - {fileID: 1147360894}
     - {fileID: 2118417545}
+  SpwanNPC: 25
   leftLineStart: {fileID: 391285551}
   leftLineEnd: {fileID: 769525697}
   rightLineStart: {fileID: 1944189022}
