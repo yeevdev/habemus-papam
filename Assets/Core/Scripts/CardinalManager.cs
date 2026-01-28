@@ -50,7 +50,7 @@ public class CardinalManager : MonoBehaviour
     // 기타 멤버변수
     // 데이터 관리는 여전히 Cardinal 클래스를 통해 합니다.
     private List<Cardinal> cardinals;
-
+    public List<Cardinal> Cardinals => cardinals;
    
 
     void Awake()
