@@ -69,10 +69,16 @@ public class StateController : MonoBehaviour
     // 진짜 기도 위치 저장용
     private Vector3 finalPrayerPos;
 
+    public bool IsHeadingToQueue { get; private set; } = false;
+
     // Scheme 상태 NPC
     public bool IsSchemer { get; private set; } = false;
 
     private SpriteRenderer spriteRenderer;
+
+    public bool IsPerformingPrayerAction => IsHeadingToQueue ||
+                                            currentState == CardinalState.ReadyPraying ||
+                                            currentState == CardinalState.Praying;
 
     // 컴포넌트 참조
     private Cardinal cardinal;                  
@@ -224,7 +230,7 @@ public class StateController : MonoBehaviour
             case CardinalState.Praying:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.1f, 0.1f);
+                    cardinal.SetAgentSize(0.5f, 1f);
                 }
 
                 if (agent.isOnNavMesh)
@@ -247,7 +253,7 @@ public class StateController : MonoBehaviour
                 break;
 
             case CardinalState.InSpeech:
-                if (cardinal != null) cardinal.SetAgentSize(0.1f, 0.1f); // 크기 조절
+                if (cardinal != null) cardinal.SetAgentSize(0.5f, 1f); // 크기 조절
 
                 // 기존 시퀀스 코루틴 정리 -----> 레거시 함수.. 나중에 버그 발생시 활성화
 
@@ -296,7 +302,7 @@ public class StateController : MonoBehaviour
             case CardinalState.ChatMaster:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.5f, 1f);
+                    cardinal.SetAgentSize(0.2f, 0.2f);
                 }
 
                 // 상태 나갈 때 시퀀스 코루틴 정리
@@ -313,7 +319,7 @@ public class StateController : MonoBehaviour
             case CardinalState.Chatting:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.5f, 1f);
+                    cardinal.SetAgentSize(0.2f, 0.2f);
                 }
 
                 if (agent != null && agent.isOnNavMesh)
@@ -326,14 +332,14 @@ public class StateController : MonoBehaviour
             case CardinalState.CutScene:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.5f, 1f);
+                    cardinal.SetAgentSize(0.2f, 0.2f);
                 }
                 break;
 
             case CardinalState.ReadyPraying:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.5f, 1f);
+                    cardinal.SetAgentSize(0.2f, 0.2f);
                 }
                 if (agent != null) agent.avoidancePriority = 50;
                 break;
@@ -341,7 +347,7 @@ public class StateController : MonoBehaviour
             case CardinalState.Praying:
                 if (cardinal != null)
                 {
-                    cardinal.SetAgentSize(0.5f, 1f);
+                    cardinal.SetAgentSize(0.2f, 0.2f);
                 }
 
                 if (praySequenceCoroutine != null)
@@ -360,7 +366,7 @@ public class StateController : MonoBehaviour
                 HideBubble();
                 break;
             case CardinalState.ReadyInSpeech:
-                if (cardinal != null) cardinal.SetAgentSize(0.5f, 1f); // 원래 크기로
+                if (cardinal != null) cardinal.SetAgentSize(0.2f, 0.2f); // 원래 크기로
                 if (agent != null && agent.isOnNavMesh)
                 {
                     agent.avoidancePriority = 50;
@@ -368,7 +374,7 @@ public class StateController : MonoBehaviour
                 break;
 
             case CardinalState.InSpeech:
-                if (cardinal != null) cardinal.SetAgentSize(0.5f, 1f); // 원래 크기로
+                if (cardinal != null) cardinal.SetAgentSize(0.2f, 0.2f); // 원래 크기로
 
                 if (agent != null && agent.isOnNavMesh)
                 {
@@ -844,43 +850,72 @@ public class StateController : MonoBehaviour
 
     public void OrderToPray(Vector3 targetPos, bool isQueueing)
     {
-        // 상태 초기화
         isWaitingInLine = isQueueing;
-        finalPrayerPos = Vector3.zero; 
+        finalPrayerPos = Vector3.zero;
 
-        ChangeState(CardinalState.ReadyPraying);
+        IsHeadingToQueue = true; // 이동 시작 플래그
 
         if (praySequenceCoroutine != null) StopCoroutine(praySequenceCoroutine);
-        praySequenceCoroutine = StartCoroutine(ProcessPraySequence(targetPos));
+        praySequenceCoroutine = StartCoroutine(ProcessApproachAndPray(targetPos));
+    }
+
+    //취소
+    public void CancelApproach()
+    {
+        if (praySequenceCoroutine != null)
+        {
+            StopCoroutine(praySequenceCoroutine);
+            praySequenceCoroutine = null;
+        }
+
+        IsHeadingToQueue = false;
+        isWaitingInLine = false;
+
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.ResetPath();
+            agent.velocity = Vector3.zero;
+            agent.isStopped = false; 
+        }
+
+        Debug.Log("기도 시퀀스 강제 중단됨.");
     }
 
     public void ProceedToRealPrayer(Vector3 realTarget)
     {
-        if (currentState == CardinalState.ReadyPraying && isWaitingInLine)
+
+        if ((currentState == CardinalState.ReadyPraying || IsHeadingToQueue) && isWaitingInLine)
         {
-            isWaitingInLine = false; 
-            finalPrayerPos = realTarget; 
+            isWaitingInLine = false;
+            finalPrayerPos = realTarget;
         }
     }
 
 
-    private IEnumerator ProcessPraySequence(Vector3 firstTargetPos)
+    private IEnumerator ProcessApproachAndPray(Vector3 targetPos)
     {
+        // 1. 이동 시작 (아직 상태는 Idle일 수 있음)
         if (agent.isOnNavMesh)
         {
-            agent.SetDestination(firstTargetPos);
+            agent.SetDestination(targetPos);
             agent.isStopped = false;
         }
 
-        // 1차 목적지 도착 대기
+        // 2. 도착 대기
         yield return new WaitUntil(() =>
             !agent.pathPending &&
             agent.remainingDistance <= agent.stoppingDistance &&
             agent.velocity.sqrMagnitude <= 0.1f
         );
 
-        if (currentState != CardinalState.ReadyPraying) yield break;
+        if (!IsHeadingToQueue) yield break; 
 
+        if (currentState != CardinalState.ReadyPraying)
+        {
+            ChangeState(CardinalState.ReadyPraying);
+        }
+
+        IsHeadingToQueue = false; 
 
         if (isWaitingInLine)
         {
@@ -890,18 +925,13 @@ public class StateController : MonoBehaviour
                 agent.velocity = Vector3.zero;
             }
 
-            // 대기 중 방향 고정
             Vector2 waitDir = Vector2.left;
 
-            // 대기 신호가 꺼질 때까지 계속 루프
             while (isWaitingInLine)
             {
-                // 매 프레임 왼쪽을 보도록 설정
                 if (animController != null) animController.SetLookDirection(waitDir);
-
                 if (agent != null) agent.velocity = Vector3.zero;
-
-                yield return null; // 다음 프레임까지 대기
+                yield return null;
             }
         }
 
@@ -913,7 +943,6 @@ public class StateController : MonoBehaviour
                 agent.SetDestination(finalPrayerPos);
             }
 
-            // 기도 장소 도착 대기
             yield return new WaitUntil(() =>
                 !agent.pathPending &&
                 agent.remainingDistance <= agent.stoppingDistance &&
@@ -925,7 +954,6 @@ public class StateController : MonoBehaviour
 
         ChangeState(CardinalState.Praying);
 
-        // 왼쪽 보기 ,Priority 변경
         Vector2 leftDir = Vector2.left;
         float rotateTimer = 0f;
         while (rotateTimer < 0.5f)
@@ -943,20 +971,15 @@ public class StateController : MonoBehaviour
         while (currentPrayTimer < prayDuration)
         {
             if (currentState != CardinalState.Praying) yield break;
-
-            // 지속적인 방향 보정 
             if (animController != null) animController.SetLookDirection(leftDir);
-
             if (agent != null) agent.velocity = Vector3.zero;
-
             currentPrayTimer += Time.deltaTime;
-            yield return null; 
+            yield return null;
         }
 
-        //기도 함수 호출
         if (cardinal != null)
         {
-            cardinal.Pray(); 
+            cardinal.Pray();
         }
 
         ChangeState(CardinalState.Idle);

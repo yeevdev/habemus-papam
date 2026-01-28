@@ -66,6 +66,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be1a3c972436f486fbd688f4658f6c87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
+  interactKey: 20
+  interactCooldown: 5
+  gamsilManager: {fileID: 0}
 --- !u!114 &5777408536869680678
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -100,7 +103,7 @@ NavMeshAgent:
   m_GameObject: {fileID: 7455590352920837333}
   m_Enabled: 1
   m_AgentTypeID: 0
-  m_Radius: 0.5
+  m_Radius: 0.2
   m_Speed: 3.5
   m_Acceleration: 8
   avoidancePriority: 50
@@ -109,7 +112,7 @@ NavMeshAgent:
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
-  m_Height: 1
+  m_Height: 0.2
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
