@@ -69,7 +69,11 @@ public class StateController : MonoBehaviour
     // 진짜 기도 위치 저장용
     private Vector3 finalPrayerPos;
 
+    // 대기열로 이동 중인지 확인하는 플래그 (기도)
     public bool IsHeadingToQueue { get; private set; } = false;
+
+    // 대기열로 이동 중인지 확인하는 플래그 (연설)
+    public bool IsHeadingToSpeech { get; private set; } = false; // Speech
 
     // Scheme 상태 NPC
     public bool IsSchemer { get; private set; } = false;
@@ -79,6 +83,10 @@ public class StateController : MonoBehaviour
     public bool IsPerformingPrayerAction => IsHeadingToQueue ||
                                             currentState == CardinalState.ReadyPraying ||
                                             currentState == CardinalState.Praying;
+
+    public bool IsPerformingSpeechAction => IsHeadingToSpeech ||
+                                            currentState == CardinalState.ReadyInSpeech ||
+                                            currentState == CardinalState.InSpeech;
 
     // 컴포넌트 참조
     private Cardinal cardinal;                  
@@ -488,7 +496,7 @@ public class StateController : MonoBehaviour
     
 
     // ---------------------------------------------------------
-    // [이동 로직] AI 배회 (Idle)
+    // AI 배회 (Idle)
     // ---------------------------------------------------------
 
     private IEnumerator AIWanderRoutine()
@@ -514,7 +522,6 @@ public class StateController : MonoBehaviour
 
             if (transform.position.y > currentLimitY)
             {
-                // 기준선보다 1~3m 아래로 강제 설정
                 float recoveryY = currentLimitY - Random.Range(1.0f, 3.0f);
                 float randomX = transform.position.x + Random.Range(-3.0f, 3.0f);
 
@@ -862,23 +869,32 @@ public class StateController : MonoBehaviour
     //취소
     public void CancelApproach()
     {
+        // 1. 기도 취소
         if (praySequenceCoroutine != null)
         {
             StopCoroutine(praySequenceCoroutine);
             praySequenceCoroutine = null;
         }
-
         IsHeadingToQueue = false;
+
+        // 2. 연설 취소
+        if (speechSequenceCoroutine != null)
+        {
+            StopCoroutine(speechSequenceCoroutine);
+            speechSequenceCoroutine = null;
+        }
+        IsHeadingToSpeech = false;
+
+        // 공통 초기화
         isWaitingInLine = false;
 
         if (agent != null && agent.isOnNavMesh)
         {
             agent.ResetPath();
             agent.velocity = Vector3.zero;
-            agent.isStopped = false; 
+            agent.isStopped = false;
         }
-
-        Debug.Log("기도 시퀀스 강제 중단됨.");
+        Debug.Log("이동 시퀀스 강제 중단됨.");
     }
 
     public void ProceedToRealPrayer(Vector3 realTarget)
@@ -894,7 +910,7 @@ public class StateController : MonoBehaviour
 
     private IEnumerator ProcessApproachAndPray(Vector3 targetPos)
     {
-        // 1. 이동 시작 (아직 상태는 Idle일 수 있음)
+        // 1. 이동 시작
         if (agent.isOnNavMesh)
         {
             agent.SetDestination(targetPos);
@@ -952,7 +968,10 @@ public class StateController : MonoBehaviour
 
         if (currentState != CardinalState.ReadyPraying) yield break;
 
+        //기도 시작
         ChangeState(CardinalState.Praying);
+        //기도 컷씬 재생 영상 여기에서 호출하면 될 듯 합니다.
+
 
         Vector2 leftDir = Vector2.left;
         float rotateTimer = 0f;
@@ -992,29 +1011,30 @@ public class StateController : MonoBehaviour
     public void OrderToSpeech(Vector3 targetPos, bool isQueueing)
     {
         isWaitingInLine = isQueueing;
-        finalPrayerPos = Vector3.zero; 
+        finalPrayerPos = Vector3.zero;
 
-        ChangeState(CardinalState.ReadyInSpeech);
+        IsHeadingToSpeech = true;
 
         if (speechSequenceCoroutine != null) StopCoroutine(speechSequenceCoroutine);
-        speechSequenceCoroutine = StartCoroutine(ProcessSpeechSequence(targetPos));
+        // 새 코루틴 사용
+        speechSequenceCoroutine = StartCoroutine(ProcessApproachAndSpeech(targetPos));
     }
 
     public void ProceedToRealSpeech(Vector3 realTarget)
     {
-        if (currentState == CardinalState.ReadyInSpeech && isWaitingInLine)
+        if ((currentState == CardinalState.ReadyInSpeech || IsHeadingToSpeech) && isWaitingInLine)
         {
             isWaitingInLine = false;
             finalPrayerPos = realTarget;
         }
     }
 
-    private IEnumerator ProcessSpeechSequence(Vector3 firstTargetPos)
+    private IEnumerator ProcessApproachAndSpeech(Vector3 targetPos)
     {
-        // 대기소 이동
+        // 1. 접근 이동
         if (agent.isOnNavMesh)
         {
-            agent.SetDestination(firstTargetPos);
+            agent.SetDestination(targetPos);
             agent.isStopped = false;
         }
 
@@ -1024,19 +1044,21 @@ public class StateController : MonoBehaviour
             agent.velocity.sqrMagnitude <= 0.1f
         );
 
-        if (currentState != CardinalState.ReadyInSpeech) yield break;
+        // 취소 체크
+        if (!IsHeadingToSpeech) yield break;
 
-        // 대기열 대기 (Queueing)
+        // 상태 변경
+        if (currentState != CardinalState.ReadyInSpeech)
+        {
+            ChangeState(CardinalState.ReadyInSpeech);
+        }
+        IsHeadingToSpeech = false; // 도착 완료
+
+        // 2. 대기열 대기
         if (isWaitingInLine)
         {
-            if (agent.isOnNavMesh)
-            {
-                agent.isStopped = true;
-                agent.velocity = Vector3.zero;
-            }
-
-            Vector2 waitDir = Vector2.right; // 대기 방향 (필요 시 수정)
-
+            if (agent.isOnNavMesh) { agent.isStopped = true; agent.velocity = Vector3.zero; }
+            Vector2 waitDir = Vector2.right; // 연설 대기 방향
             while (isWaitingInLine)
             {
                 if (animController != null) animController.SetLookDirection(waitDir);
@@ -1045,15 +1067,10 @@ public class StateController : MonoBehaviour
             }
         }
 
-        // 진짜 연설 장소 이동
+        // 3. 진짜 연설석 이동
         if (finalPrayerPos != Vector3.zero)
         {
-            if (agent.isOnNavMesh)
-            {
-                agent.isStopped = false;
-                agent.SetDestination(finalPrayerPos);
-            }
-
+            if (agent.isOnNavMesh) { agent.isStopped = false; agent.SetDestination(finalPrayerPos); }
             yield return new WaitUntil(() =>
                 !agent.pathPending &&
                 agent.remainingDistance <= agent.stoppingDistance &&
@@ -1062,39 +1079,41 @@ public class StateController : MonoBehaviour
         }
 
         if (currentState != CardinalState.ReadyInSpeech) yield break;
-
-        // 연설 시작 (InSpeech)
+        //연설 시작
         ChangeState(CardinalState.InSpeech);
+        //여기에 컷 씬 재생하는 함수 호출하면 될 듯 합니다.
+
 
         Vector2 speechDir = Vector2.down;
 
+        // 자리 잡기 및 방향 고정
         float rotateTimer = 0f;
         while (rotateTimer < 0.5f)
         {
             if (currentState != CardinalState.InSpeech) yield break;
+
             if (animController != null) animController.SetLookDirection(speechDir);
             if (agent != null) agent.velocity = Vector3.zero;
+
             rotateTimer += Time.deltaTime;
             yield return null;
         }
 
         if (agent != null) agent.avoidancePriority = 0;
 
+        // 실제 연설 진행
         float currentSpeechTimer = 0f;
-        while (currentSpeechTimer < speechDuration) 
+        while (currentSpeechTimer < speechDuration)
         {
             if (currentState != CardinalState.InSpeech) yield break;
             if (animController != null) animController.SetLookDirection(speechDir);
             if (agent != null) agent.velocity = Vector3.zero;
+
             currentSpeechTimer += Time.deltaTime;
             yield return null;
         }
 
-        if (cardinal != null)
-        {
-            cardinal.Speech(); // Cardinal.cs의 Speech() 호출
-        }
-
+        if (cardinal != null) cardinal.Speech();
         ChangeState(CardinalState.Idle);
     }
 

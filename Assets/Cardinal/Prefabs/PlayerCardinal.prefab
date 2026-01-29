@@ -67,8 +67,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   interactKey: 20
+  speechKey: 21
   interactCooldown: 5
   gamsilManager: {fileID: 0}
+  lectureManager: {fileID: 0}
 --- !u!114 &5777408536869680678
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -93,7 +95,7 @@ MonoBehaviour:
   SpeechingBubblePrefab: {fileID: 7420857138657768832, guid: 1dffa87288485bc43ac97834b819a969, type: 3}
   bubbleOffset: {x: 0, y: 1, z: 0}
   prayDuration: 7
-  speechDuration: 3
+  speechDuration: 7
 --- !u!195 &7058176528115609993
 NavMeshAgent:
   m_ObjectHideFlags: 0
